@@ -49,6 +49,8 @@ if archivo:
     st.subheader("📊 Resultados de las pruebas de normalidad")
     texto_resultado = []
 
-    st.write("**Shapiro-Wilk**")
-    st.write(f"Estadístico: {shapiro_stat:.4f}, Valor-p: {shapiro_p:.4f}")
-    interpretacion_sw = "No se rechaza la normalidad ✅" if shapiro_p > 0.
+st.write("**Shapiro-Wilk**")
+st.write(f"Estadístico: {shapiro_stat:.4f}, Valor-p: {shapiro_p:.4f}")
+interpretacion_sw = "No se rechaza la normalidad ✅" if shapiro_p > 0.05 else "Se rechaza la normalidad ❌"
+st.write("→ " + interpretacion_sw)
+texto_resultado.append(f"Shapiro-Wilk: estadístico = {shapiro_stat:.4f}, p = {shapiro_p:.4f} → {interpretacion_sw}")

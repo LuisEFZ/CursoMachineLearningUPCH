@@ -7,3 +7,4 @@ scipy
 python-docx
 fpdf
 openpyxl
+fpdf2

@@ -1,119 +1,102 @@
+# normalidad_app.py
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-from scipy.stats import shapiro, anderson, kstest, norm, probplot
+import scipy.stats as stats
 from io import BytesIO
 from docx import Document
 from docx.shared import Inches
 from fpdf import FPDF
+import os
+import seaborn as sns
 
-# Configuración de la aplicación
+# Configuración general
 st.set_page_config(page_title="Prueba de Normalidad", layout="centered")
-st.title("📈 Análisis de Normalidad")
-st.write("Sube un archivo Excel con hasta 100 datos numéricos para evaluar si siguen una distribución normal.")
+st.title("🧪 Análisis de Normalidad para una Variable Cuantitativa Continua")
 
-# Cargar archivo
-uploaded_file = st.file_uploader("Cargar archivo Excel (.xlsx)", type=["xlsx"])
+# Sección: Cargar archivo
+st.header("1. Cargar archivo Excel")
+archivo = st.file_uploader("Carga tu archivo .xlsx (máximo 106 datos)", type=["xlsx"])
 
-# Selección del nivel de significancia
-alpha_default = 0.05
-alpha = st.number_input(
-    "Selecciona el nivel de significancia (α)", 
-    min_value=0.01, max_value=0.10, 
-    value=alpha_default, step=0.01
-)
-
-if uploaded_file:
+if archivo is not None:
+    # Leer datos y verificar si tiene encabezado
+    encabezado = st.checkbox("¿El archivo tiene encabezado?", value=True)
     try:
-        df = pd.read_excel(uploaded_file, engine="openpyxl")
-    except Exception as e:
-        st.error(f"❌ Error al leer el archivo: {e}")
-    else:
-        st.subheader("Vista previa de los datos")
-        st.dataframe(df.head())
+        df = pd.read_excel(archivo, header=0 if encabezado else None)
+        col_numericas = df.select_dtypes(include=[np.number]).columns.tolist()
 
-        # Verificar si tiene encabezado
-        columnas_numericas = df.select_dtypes(include=["number"]).columns.tolist()
-        if not columnas_numericas:
-            st.error("❌ No se encontraron columnas numéricas.")
+        if not col_numericas:
+            st.error("⚠️ El archivo no contiene columnas numéricas válidas.")
         else:
-            columna = st.selectbox("Selecciona la columna a analizar", columnas_numericas)
+            columna = st.selectbox("Selecciona la columna numérica a analizar:", col_numericas)
             datos = df[columna].dropna().values
 
-            if len(datos) > 100:
-                st.warning("⚠️ Se analizarán solo los primeros 100 datos.")
-                datos = datos[:100]
+            if len(datos) > 106:
+                st.warning("⚠️ Solo se analizarán los primeros 106 datos.")
+                datos = datos[:106]
 
-            st.success(f"Se analizarán {len(datos)} datos.")
+            # Sección: Nivel de significancia
+            st.header("2. Selección del nivel de significancia")
+            alfa_opcion = st.radio("¿Deseas usar el nivel de significancia por defecto (0.05)?", ("Sí", "No"))
+            if alfa_opcion == "No":
+                alfa = st.number_input("Ingresa el nivel de significancia (por ejemplo, 0.01, 0.05, 0.10):", min_value=0.001, max_value=0.2, value=0.05, step=0.001)
+            else:
+                alfa = 0.05
 
-            # Prueba de Shapiro-Wilk
-            shapiro_stat, shapiro_p = shapiro(datos)
-            interpretacion_sw = "No se rechaza la normalidad ✅" if shapiro_p > alpha else "Se rechaza la normalidad ❌"
+            # Sección: Pruebas de normalidad
+            st.header("3. Resultados de las pruebas de normalidad")
+            shapiro_stat, shapiro_p = stats.shapiro(datos)
+            anderson_result = stats.anderson(datos, dist='norm')
+            ks_stat, ks_p = stats.kstest((datos - np.mean(datos)) / np.std(datos), 'norm')
 
-            # Prueba de Anderson-Darling
-            ad_result = anderson(datos, dist='norm')
-            ad_stat = ad_result.statistic
-            ad_critical = dict(zip(ad_result.significance_level, ad_result.critical_values))
-            ad_interp = "No se rechaza la normalidad ✅" if ad_stat < ad_critical.get(alpha*100, np.inf) else "Se rechaza la normalidad ❌"
+            st.subheader("Prueba de Shapiro-Wilk")
+            st.write(f"Estadístico: {shapiro_stat:.4f}, Valor-p: {shapiro_p:.4f}")
+            interpretacion_sw = "No se rechaza la normalidad ✅" if shapiro_p > alfa else "Se rechaza la normalidad ❌"
+            st.write(interpretacion_sw)
 
-            # Prueba de Kolmogorov-Smirnov
-            ks_stat, ks_p = kstest(datos, 'norm', args=(np.mean(datos), np.std(datos)))
-            interpretacion_ks = "No se rechaza la normalidad ✅" if ks_p > alpha else "Se rechaza la normalidad ❌"
+            st.subheader("Prueba de Anderson-Darling")
+            st.write(f"Estadístico: {anderson_result.statistic:.4f}")
+            for i, (cv, sig) in enumerate(zip(anderson_result.critical_values, anderson_result.significance_level)):
+                st.write(f"  - Nivel {sig:.1f}%: Crítico = {cv:.4f} {'✅' if anderson_result.statistic < cv else '❌'}")
 
-            # Resultados
-            st.subheader("📊 Resultados de las pruebas de normalidad")
-            st.write(f"**Shapiro-Wilk**: Estadístico = {shapiro_stat:.4f}, p-valor = {shapiro_p:.4f} → {interpretacion_sw}")
-            st.write(f"**Anderson-Darling**: Estadístico = {ad_stat:.4f}, valor crítico (α={alpha}) = {ad_critical.get(alpha*100, 'N/A'):.4f} → {ad_interp}")
-            st.write(f"**Kolmogorov-Smirnov**: Estadístico = {ks_stat:.4f}, p-valor = {ks_p:.4f} → {interpretacion_ks}")
+            st.subheader("Prueba de Kolmogorov-Smirnov")
+            st.write(f"Estadístico: {ks_stat:.4f}, Valor-p: {ks_p:.4f}")
+            interpretacion_ks = "No se rechaza la normalidad ✅" if ks_p > alfa else "Se rechaza la normalidad ❌"
+            st.write(interpretacion_ks)
 
-            # Gráficos
-            st.subheader("📈 Gráficos")
-            fig, ax = plt.subplots(1, 3, figsize=(15, 4))
-            sns.histplot(datos, kde=True, ax=ax[0])
-            ax[0].set_title("Histograma")
-            sns.boxplot(x=datos, ax=ax[1])
-            ax[1].set_title("Boxplot")
-            probplot(datos, dist="norm", plot=ax[2])
-            ax[2].set_title("Q-Q Plot")
+            # Sección: Gráficos
+            st.header("4. Visualización de los datos")
+            fig, axs = plt.subplots(1, 3, figsize=(15, 4))
+            sns.histplot(datos, kde=True, ax=axs[0], color="skyblue").set(title="Histograma")
+            sns.boxplot(x=datos, ax=axs[1], color="lightgreen").set(title="Boxplot")
+            stats.probplot(datos, dist="norm", plot=axs[2])
+            axs[2].set_title("Gráfico Q-Q")
             st.pyplot(fig)
 
-            # Generar documento Word
-            doc = Document()
-            doc.add_heading("Informe de Pruebas de Normalidad", 0)
-            doc.add_paragraph(f"Nivel de significancia seleccionado: {alpha}")
-            doc.add_paragraph(f"Shapiro-Wilk: Estadístico = {shapiro_stat:.4f}, p-valor = {shapiro_p:.4f} → {interpretacion_sw}")
-            doc.add_paragraph(f"Anderson-Darling: Estadístico = {ad_stat:.4f}, valor crítico (α={alpha}) = {ad_critical.get(alpha*100, 'N/A'):.4f} → {ad_interp}")
-            doc.add_paragraph(f"Kolmogorov-Smirnov: Estadístico = {ks_stat:.4f}, p-valor = {ks_p:.4f} → {interpretacion_ks}")
-            buffer_word = BytesIO()
-            doc.save(buffer_word)
-            buffer_word.seek(0)
-            st.download_button("📄 Descargar informe en Word", data=buffer_word, file_name="informe_normalidad.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            # Sección: Exportar a Word
+            st.header("5. Exportar informe")
+            if st.button("📄 Descargar informe Word"):
+                doc = Document()
+                doc.add_heading("Informe de Prueba de Normalidad", level=1)
 
-            # Generar PDF
-            class PDF(FPDF):
-                def __init__(self):
-                    super().__init__()
-                    self.add_font('DejaVu', '', 'fonts/DejaVuSans.ttf', uni=True)
-                    self.set_font('DejaVu', '', 12)
-                    self.set_auto_page_break(auto=True, margin=15)
+                doc.add_paragraph(f"Se evaluó la normalidad de la variable '{columna}' con {len(datos)} datos.")
+                doc.add_paragraph(f"Nivel de significancia seleccionado: {alfa:.3f}")
 
-            pdf = PDF()
-            pdf.add_page()
-            pdf.set_font("DejaVu", "", 14)
-            pdf.cell(0, 10, "Informe de Pruebas de Normalidad", ln=True, align="C")
-            pdf.ln(10)
-            pdf.set_font("DejaVu", "", 12)
-            pdf.cell(0, 10, f"Nivel de significancia seleccionado: {alpha}", ln=True)
-            pdf.ln(5)
-            pdf.multi_cell(0, 10, f"📊 Shapiro-Wilk:\nEstadístico = {shapiro_stat:.4f}, p-valor = {shapiro_p:.4f} → {interpretacion_sw}")
-            pdf.multi_cell(0, 10, f"📊 Anderson-Darling:\nEstadístico = {ad_stat:.4f}, valor crítico (α={alpha}) = {ad_critical.get(alpha*100, 'N/A'):.4f} → {ad_interp}")
-            pdf.multi_cell(0, 10, f"📊 Kolmogorov-Smirnov:\nEstadístico = {ks_stat:.4f}, p-valor = {ks_p:.4f} → {interpretacion_ks}")
-            pdf.ln(5)
-            pdf.multi_cell(0, 10, "Conclusión: Se realizó una evaluación rigurosa de normalidad utilizando tres pruebas estadísticas con un nivel de significancia ajustable. Los resultados sugieren la aceptación o el rechazo de la hipótesis de normalidad en función de los valores-p obtenidos y los umbrales críticos.")
+                doc.add_heading("Resultados de las pruebas", level=2)
+                doc.add_paragraph(f"Shapiro-Wilk: Estadístico = {shapiro_stat:.4f}, Valor-p = {shapiro_p:.4f}. {interpretacion_sw}")
+                doc.add_paragraph(f"Anderson-Darling: Estadístico = {anderson_result.statistic:.4f}")
+                for sig, cv in zip(anderson_result.significance_level, anderson_result.critical_values):
+                    doc.add_paragraph(f"  - Nivel {sig:.1f}%: Crítico = {cv:.4f} {'✅' if anderson_result.statistic < cv else '❌'}")
+                doc.add_paragraph(f"Kolmogorov-Smirnov: Estadístico = {ks_stat:.4f}, Valor-p = {ks_p:.4f}. {interpretacion_ks}")
 
-            pdf_buffer = BytesIO()
-            pdf.output(pdf_buffer)
-            pdf_buffer.seek(0)
-            st.download_button("📄 Descargar informe en PDF", data=pdf_buffer, file_name="informe_normalidad.pdf", mime="application/pdf")
+                # Guardar y descargar
+                word_buffer = BytesIO()
+                doc.save(word_buffer)
+                st.download_button(
+                    label="📥 Descargar Word",
+                    data=word_buffer.getvalue(),
+                    file_name="informe_normalidad.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )

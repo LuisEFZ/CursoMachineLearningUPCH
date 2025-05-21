@@ -1,4 +1,3 @@
-pip install streamlit pandas scipy matplotlib openpyxl
 import streamlit as st
 import pandas as pd
 import scipy.stats as stats

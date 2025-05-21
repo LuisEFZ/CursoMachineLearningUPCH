@@ -40,17 +40,3 @@ if archivo:
     if len(datos) < 3:
         st.warning("Se requieren al menos 3 datos numéricos para realizar las pruebas.")
         st.stop()
-
-    # Pruebas de normalidad
-    shapiro_stat, shapiro_p = stats.shapiro(datos)
-    ks_stat, ks_p = stats.kstest(stats.zscore(datos), 'norm')
-    ad_result = stats.anderson(datos, dist='norm')
-
-    st.subheader("📊 Resultados de las pruebas de normalidad")
-    texto_resultado = []
-
-st.write("**Shapiro-Wilk**")
-st.write(f"Estadístico: {shapiro_stat:.4f}, Valor-p: {shapiro_p:.4f}")
-interpretacion_sw = "No se rechaza la normalidad ✅" if shapiro_p > 0.05 else "Se rechaza la normalidad ❌"
-st.write("→ " + interpretacion_sw)
-texto_resultado.append(f"Shapiro-Wilk: estadístico = {shapiro_stat:.4f}, p = {shapiro_p:.4f} → {interpretacion_sw}")

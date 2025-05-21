@@ -1,6 +1,9 @@
 streamlit
 pandas
-scipy
+numpy
 matplotlib
-openpyxl
+seaborn
+scipy
+fpdf2
 python-docx
+openpyxl

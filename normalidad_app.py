@@ -4,6 +4,7 @@ import scipy.stats as stats
 import matplotlib.pyplot as plt
 import io
 from docx import Document
+import docx.shared  # Para definir el tamaño de imágenes en Word
 
 st.set_page_config(page_title="Pruebas de Normalidad", layout="centered")
 
@@ -80,7 +81,7 @@ if archivo:
     stats.probplot(datos, dist="norm", plot=ax)
     st.pyplot(fig)
 
-    # Exportar a Word
+    # Exportar informe Word
     st.subheader("📤 Exportar informe")
     if st.button("📄 Exportar resultados a Word"):
         doc = Document()
@@ -90,9 +91,19 @@ if archivo:
         for linea in texto_resultado:
             doc.add_paragraph(linea)
 
+        # Guardar gráfico en memoria
+        imagen_buffer = io.BytesIO()
+        fig.savefig(imagen_buffer, format='png')
+        imagen_buffer.seek(0)
+
+        doc.add_heading("Gráfico Q-Q", level=1)
+        doc.add_picture(imagen_buffer, width=docx.shared.Inches(5))
+
+        # Guardar Word en memoria
         buffer = io.BytesIO()
         doc.save(buffer)
         buffer.seek(0)
+
         st.download_button(
             label="⬇️ Descargar informe Word",
             data=buffer,
